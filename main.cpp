@@ -102,6 +102,27 @@ void printGantt(const SimResult& r) {
   std::cout << "\n";
 }
 
+std::vector<Process> makeConvoySet() {
+  std::vector<Process> procs;
+  auto add = [&](int pid, const std::string& name, std::uint64_t arrival,
+    std::uint64_t burst, int priority,
+      std::vector<IoBlock> io = {}) {
+        Process p;
+        p.pid = pid; p.name = name;
+        p.arrivalTime = arrival;
+        p.burstTime = burst;
+        p.remainingTime = burst;
+        p.priority = priority;
+        p.dynamicPriority = priority;
+        p.ioBlocks = std::move(io);
+        procs.push_back(p);
+  };
+  add(1, "CPU1", 0, 20, 2);
+  add(2, "IO1", 1, 6, 1, {{1, 4}, {2, 4}, {3, 4}, {4, 4}, {5, 4}});
+  add(3, "IO2", 2, 6, 1, {{1, 4}, {2, 4}, {3, 4}, {4, 4}, {5, 4}});
+  add(4, "CPU2", 3, 12, 3);
+  return procs;
+}
 
 int main() {
   std::cout << "Case 1: CPU-bound\n";
@@ -252,6 +273,54 @@ int main() {
       << " " << std::setw(3) << r.contextSwitches << " "
       << std::string(r.contextSwitches, '#') << "\n";
     }
+  }
+
+    // ===== Case 6: Convoy effect =====
+  std::cout << "\nCase 6. Convoy effect: FCFS vs MLFQ (makeConvoySet)\n";
+
+  std::cout << "\n--- FCFS ---\n";
+  {
+    auto set = makeConvoySet();
+    FcfsScheduler s(set);
+    SimResult r = runSimulation(s);
+    printResult(r);
+    printProcessTable(s.processes());
+  }
+
+  std::cout << "\n--- SRTN ---\n";
+  {
+    auto set = makeConvoySet();
+    SrtnScheduler s(set);
+    SimResult r = runSimulation(s);
+    printResult(r);
+    printProcessTable(s.processes());
+  }
+
+  std::cout << "\n--- RR (q=4) ---\n";
+  {
+    auto set = makeConvoySet();
+    RrScheduler s(set, 4);
+    SimResult r = runSimulation(s);
+    printResult(r);
+    printProcessTable(s.processes());
+  }
+
+  std::cout << "\n--- Priority (preemptive) + aging ---\n";
+  {
+    auto set = makeConvoySet();
+    PriorityScheduler s(set, true, true);
+    SimResult r = runSimulation(s);
+    printResult(r);
+    printProcessTable(s.processes());
+  }
+
+  std::cout << "\n--- MLFQ ---\n";
+  {
+    auto set = makeConvoySet();
+    MlfqScheduler s(set);
+    SimResult r = runSimulation(s);
+    printResult(r);
+    printProcessTable(s.processes());
   }
 
   return 0;
