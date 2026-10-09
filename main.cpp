@@ -6,6 +6,7 @@
 #include "mlfq.h"
 #include "simulator.h"
 #include "testsets.h"
+#include "hrrn.h"
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -78,6 +79,27 @@ void printGantt(const SimResult& r) {
   std::cout << "\n";
 }
 
+std::vector<Process> makeHrrnTestSet() {
+  std::vector<Process> procs;
+  auto add = [&](int pid, const std::string& name, std::uint64_t arrival,
+                 std::uint64_t burst, int priority) {
+    Process p;
+    p.pid = pid;
+    p.name = name;
+    p.arrivalTime = arrival;
+    p.burstTime = burst;
+    p.remainingTime = burst;
+    p.priority = priority;
+    p.dynamicPriority = priority;
+    procs.push_back(p);
+  };
+  add(1, "A",  0, 4, 1);
+  add(2, "L",  1, 6, 1);
+  add(3, "S1", 4, 2, 1);
+  add(4, "S2", 5, 1, 1);
+  return procs;
+}
+
 int main() {
   std::cout << "Case 1: CPU-bound\n";
   {
@@ -93,6 +115,7 @@ int main() {
     scheds.push_back(std::make_unique<PriorityScheduler>(set1, true, false));
     scheds.push_back(std::make_unique<PriorityScheduler>(set1, true, true));
     scheds.push_back(std::make_unique<MlfqScheduler>(set1));
+    scheds.push_back(std::make_unique<HrrnScheduler>(set1));
     for (auto& s : scheds) printResult(runSimulation(*s));
   }
 
@@ -106,6 +129,21 @@ int main() {
     scheds.push_back(std::make_unique<PriorityScheduler>(set2, true, true));
     scheds.push_back(std::make_unique<MlfqScheduler>(set2));
     for (auto& s : scheds) printResult(runSimulation(*s));
+  }
+
+    std::cout << "\nCase 3. HRRN vs SJF (starvation demo)\n";
+  {
+    auto set3 = makeHrrnTestSet();
+
+    SjfScheduler sjf(set3);
+    SimResult rSjf = runSimulation(sjf);
+    printResult(rSjf);
+    printGantt(rSjf);
+
+    HrrnScheduler hrrn(set3);
+    SimResult rHrrn = runSimulation(hrrn);
+    printResult(rHrrn);
+    printGantt(rHrrn);
   }
 
   std::cout << "\n";
