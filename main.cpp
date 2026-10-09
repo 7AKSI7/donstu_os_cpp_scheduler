@@ -102,6 +102,7 @@ void printGantt(const SimResult& r) {
   std::cout << "\n";
 }
 
+
 int main() {
   std::cout << "Case 1: CPU-bound\n";
   {
@@ -238,6 +239,20 @@ int main() {
     printResult(runSimulation(a));
     printResult(runSimulation(b)); // строки должны совпасть
   }
-  
+
+  {
+    auto set = makeTestSet();
+    std::cout << "\nВлияние кванта в RR (набор makeTestSet)\n";
+    std::cout << "q wait turn resp CS\n";
+    for (std::uint64_t q : {1, 2, 4, 8, 16}) {
+      RrScheduler rr(set, q);
+      SimResult r = runSimulation(rr);
+      std::cout << std::setw(2) << q << " " << std::fixed << std::setprecision(2)
+      << r.avgWaiting << " " << r.avgTurnaround << " " << r.avgResponse
+      << " " << std::setw(3) << r.contextSwitches << " "
+      << std::string(r.contextSwitches, '#') << "\n";
+    }
+  }
+
   return 0;
 }
