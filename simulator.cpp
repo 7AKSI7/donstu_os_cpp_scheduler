@@ -1,6 +1,7 @@
 #include "simulator.h"
 
-SimResult runSimulation(Scheduler& sched, std::uint64_t maxTicks) {
+SimResult runSimulation(Scheduler& sched, std::uint64_t maxTicks,
+                        std::uint64_t switchCost) {
   SimResult res;
   res.algorithm = sched.name();
 
@@ -8,6 +9,10 @@ SimResult runSimulation(Scheduler& sched, std::uint64_t maxTicks) {
   int currentPid = -1;
   int prevPid = -1;
   std::uint64_t busyTicks = 0;
+
+  // сколько тактов осталось потратить на переключение контекста
+  std::uint64_t switchLeft = 0;
+  std::uint64_t overheadTicks = 0;
 
   auto& procs = sched.processes();
 
@@ -53,17 +58,24 @@ SimResult runSimulation(Scheduler& sched, std::uint64_t maxTicks) {
           }
           p->state = ProcessState::RUNNING;
           p->contextSwitches++;
-          if (prevPid != currentPid) res.contextSwitches++;
+          if (prevPid != currentPid) {
+            res.contextSwitches++;
+            switchLeft = switchCost; // этот такт уйдёт на переключение
+          }
         }
       }
     }
 
-    // 7. Выполняем один такт
+    // 7. Выполняем один такт (или тратим его на переключение контекста)
     int ranPid = -1;
-    if (currentPid != -1) {
+    bool overheadTick = (currentPid != -1 && switchLeft > 0);
+
+    if (overheadTick) {
+      switchLeft--;
+      overheadTicks++;
+    } else if (currentPid != -1) {
       Process* p = sched.find(currentPid);
       if (p) {
-        // запомним, кто реально выполнялся в этом такте
         ranPid = currentPid;
 
         p->remainingTime--;
@@ -91,17 +103,21 @@ SimResult runSimulation(Scheduler& sched, std::uint64_t maxTicks) {
       }
     }
 
-
-     // 7a. Все, кто остался в READY, ждали этот такт
-
+    // 7a. Все, кто остался в READY, ждали этот такт
     for (auto& p : procs) {
       if (p.state == ProcessState::READY) {
-      p.waitingTime++;
+        p.waitingTime++;
       }
     }
 
-    // 8. Запись в диаграмму Ганта (по фактически выполнявшемуся процессу)
-    if (ranPid != -1) {
+    // 8. Запись в диаграмму Ганта
+    if (overheadTick) {
+      if (!res.gantt.empty() && res.gantt.back().first == -2) {
+        res.gantt.back().second.second = tick + 1;
+      } else {
+        res.gantt.push_back({-2, {tick, tick + 1}});
+      }
+    } else if (ranPid != -1) {
       if (!res.gantt.empty() && res.gantt.back().first == ranPid) {
         res.gantt.back().second.second = tick + 1;
       } else {
@@ -122,7 +138,7 @@ SimResult runSimulation(Scheduler& sched, std::uint64_t maxTicks) {
       }
     }
 
-    prevPid = ranPid;
+    prevPid = overheadTick ? currentPid : ranPid;
     tick++;
   }
 
@@ -145,6 +161,8 @@ SimResult runSimulation(Scheduler& sched, std::uint64_t maxTicks) {
   res.totalTicks = tick;
   res.cpuUtilization = tick > 0 ? 100.0 * busyTicks / tick : 0.0;
   res.throughput = finished;
+  res.overheadTicks = overheadTicks;
+  res.overheadPercent = tick > 0 ? 100.0 * overheadTicks / tick : 0.0;
 
   return res;
 }

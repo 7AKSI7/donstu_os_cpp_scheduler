@@ -58,27 +58,6 @@ std::vector<Process> makeIoTestSet() {
   return procs;
 }
 
-void printResult(const SimResult& r) {
-  std::cout << std::left << std::setw(30) << r.algorithm
-            << " | wait=" << std::setw(7) << std::fixed << std::setprecision(2) << r.avgWaiting
-            << " | turn=" << std::setw(7) << r.avgTurnaround
-            << " | resp=" << std::setw(7) << r.avgResponse
-            << " | CPU=" << std::setw(6) << r.cpuUtilization << "%"
-            << " | CS=" << std::setw(4) << r.contextSwitches
-            << " | done=" << r.throughput
-            << "\n";
-}
-
-void printGantt(const SimResult& r) {
-  std::cout << "Gantt (" << r.algorithm << "):\n";
-  for (auto& [pid, span] : r.gantt) {
-    std::cout << "  [" << span.first << "-" << span.second << ") ";
-    if (pid == -1) std::cout << "IDLE\n";
-    else std::cout << "P" << pid << "\n";
-  }
-  std::cout << "\n";
-}
-
 std::vector<Process> makeHrrnTestSet() {
   std::vector<Process> procs;
   auto add = [&](int pid, const std::string& name, std::uint64_t arrival,
@@ -98,6 +77,29 @@ std::vector<Process> makeHrrnTestSet() {
   add(3, "S1", 4, 2, 1);
   add(4, "S2", 5, 1, 1);
   return procs;
+}
+
+void printResult(const SimResult& r) {
+  std::cout << std::left << std::setw(30) << r.algorithm
+            << " | wait=" << std::setw(7) << std::fixed << std::setprecision(2) << r.avgWaiting
+            << " | turn=" << std::setw(7) << r.avgTurnaround
+            << " | resp=" << std::setw(7) << r.avgResponse
+            << " | CPU=" << std::setw(6) << r.cpuUtilization << "%"
+            << " | CS=" << std::setw(4) << r.contextSwitches
+            << " | overhead=" << std::setw(5) << r.overheadPercent << "%"
+            << " | done=" << r.throughput
+            << "\n";
+}
+
+void printGantt(const SimResult& r) {
+  std::cout << "Gantt (" << r.algorithm << "):\n";
+  for (auto& [pid, span] : r.gantt) {
+    std::cout << "  [" << span.first << "-" << span.second << ") ";
+    if (pid == -1) std::cout << "IDLE\n";
+    else if (pid == -2) std::cout << "CS\n";
+    else std::cout << "P" << pid << "\n";
+  }
+  std::cout << "\n";
 }
 
 int main() {
@@ -131,7 +133,7 @@ int main() {
     for (auto& s : scheds) printResult(runSimulation(*s));
   }
 
-    std::cout << "\nCase 3. HRRN vs SJF (starvation demo)\n";
+  std::cout << "\nCase 3. HRRN vs SJF (starvation demo)\n";
   {
     auto set3 = makeHrrnTestSet();
 
@@ -146,11 +148,73 @@ int main() {
     printGantt(rHrrn);
   }
 
+  // ===== Case 4: RR quantum vs switch cost =====
+  std::cout << "\nCase 4. RR: quantum vs switch cost (makeTestSet)\n";
+  {
+    std::cout << std::left
+              << std::setw(6) << "q"
+              << std::setw(8) << "cost"
+              << std::setw(10) << "wait"
+              << std::setw(10) << "turn"
+              << std::setw(10) << "resp"
+              << std::setw(10) << "CPU%"
+              << std::setw(12) << "overhead%"
+              << std::setw(6) << "CS"
+              << "\n";
+    std::cout << std::string(72, '-') << "\n";
+
+    for (std::uint64_t q : {1u, 2u, 4u, 8u}) {
+      for (std::uint64_t cost : {0u, 1u}) {
+        auto set = makeTestSet();
+        RrScheduler rr(set, q);
+        SimResult r = runSimulation(rr, 100000, cost);
+        std::cout << std::left
+                  << std::setw(6) << q
+                  << std::setw(8) << cost
+                  << std::setw(10) << std::fixed << std::setprecision(2) << r.avgWaiting
+                  << std::setw(10) << r.avgTurnaround
+                  << std::setw(10) << r.avgResponse
+                  << std::setw(10) << r.cpuUtilization
+                  << std::setw(12) << r.overheadPercent
+                  << std::setw(6) << r.contextSwitches
+                  << "\n";
+      }
+    }
+
+    std::cout << "\nFCFS with switch cost:\n";
+    std::cout << std::string(72, '-') << "\n";
+    for (std::uint64_t cost : {0u, 1u}) {
+      auto set = makeTestSet();
+      FcfsScheduler fcfs(set);
+      SimResult r = runSimulation(fcfs, 100000, cost);
+      std::cout << std::left
+                << std::setw(6) << "FCFS"
+                << std::setw(8) << cost
+                << std::setw(10) << std::fixed << std::setprecision(2) << r.avgWaiting
+                << std::setw(10) << r.avgTurnaround
+                << std::setw(10) << r.avgResponse
+                << std::setw(10) << r.cpuUtilization
+                << std::setw(12) << r.overheadPercent
+                << std::setw(6) << r.contextSwitches
+                << "\n";
+    }
+  }
+
+  // ===== Гант RR q=2 без стоимости =====
   std::cout << "\n";
   {
     auto set = makeTestSet();
     RrScheduler rr(set, 2);
     SimResult r = runSimulation(rr);
+    printGantt(r);
+  }
+
+  // ===== Гант RR q=2 cost=1 (видно CS) =====
+  std::cout << "Gantt RR q=2 cost=1 (CS = переключение):\n";
+  {
+    auto set = makeTestSet();
+    RrScheduler rr(set, 2);
+    SimResult r = runSimulation(rr, 100000, 1);
     printGantt(r);
   }
 
@@ -174,5 +238,6 @@ int main() {
     printResult(runSimulation(a));
     printResult(runSimulation(b)); // строки должны совпасть
   }
+  
   return 0;
 }
