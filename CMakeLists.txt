@@ -18,6 +18,10 @@ add_executable(donstu_os_cpp_scheduler main.cpp
     simulator.cpp
 )
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+	target_compile_options(donstu_os_cpp_scheduler PRIVATE -Wall -Wextra)
+endif()
+
 include(GNUInstallDirs)
 install(TARGETS donstu_os_cpp_scheduler
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

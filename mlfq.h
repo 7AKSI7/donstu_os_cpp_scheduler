@@ -72,8 +72,7 @@ public:
       if (!queues_[lvl].empty()) return true;
     }
     // Квант текущего уровня истёк
-    if (levelQuantumUsed_[currentLevel_] >=
-        static_cast<int>(quantums_[currentLevel_])) {
+    if (static_cast<std::uint64_t>(levelQuantumUsed_[currentLevel_]) >= quantums_[currentLevel_]) {
       Process* p = find(currentPid);
       if (p && !p->isFinished()) {
         // Удаляем из текущей очереди

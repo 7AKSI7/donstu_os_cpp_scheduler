@@ -45,6 +45,10 @@ struct Process {
 
   // Метрики (заполняются симулятором)
   // момент первого запуска
+
+  // запускался ли процесс хотя бы раз
+  bool started = false;
+  
   std::uint64_t startTime = 0;
   // момент завершения
   std::uint64_t finishTime = 0;
