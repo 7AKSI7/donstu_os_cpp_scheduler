@@ -124,5 +124,17 @@ int main() {
     printProcessTable(rr.processes());
   }
 
+  {
+    auto set = makeTestSet();
+    saveSet("sets/set_basic.txt", set);
+    std::vector<Process> loaded;
+    if (!loadSet("sets/set_basic.txt", loaded)) {
+      std::cerr << "Не удалось загрузить set_basic.txt\n";
+      return 1;
+    }
+    FcfsScheduler a(set), b(loaded);
+    printResult(runSimulation(a));
+    printResult(runSimulation(b)); // строки должны совпасть
+  }
   return 0;
 }

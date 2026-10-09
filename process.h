@@ -40,6 +40,8 @@ struct Process {
   std::uint64_t remainingTime = 0;
   // чем меньше, тем выше приоритет
   int priority = 0;
+  // абсолютный дедлайн (такт, к которому нужно завершиться); 0 — нет дедлайна
+  std::uint64_t deadline = 0;
   // список I/O-блокировок
   std::vector<IoBlock> ioBlocks;
 
