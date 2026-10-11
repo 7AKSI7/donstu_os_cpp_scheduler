@@ -79,3 +79,31 @@ inline bool loadSet(const std::string& path, std::vector<Process>& procs) {
 	}
 	return true;
 }
+
+// Случайный набор процессов. Один и тот же seed всегда даёт один и тот же набор.
+inline std::vector<Process> makeRandomSet(unsigned seed, int count) {
+	std::mt19937 gen(seed);
+	std::uniform_int_distribution<int> arrival(0, 30), burst(2, 15);
+	std::uniform_int_distribution<int> prio(1, 5), coin(0, 99);
+	std::vector<Process> procs;
+	for (int i = 0; i < count; ++i) {
+		Process p;
+		p.pid = i + 1;
+		p.name = "P" + std::to_string(i + 1);
+		p.arrivalTime = static_cast<std::uint64_t>(arrival(gen));
+		p.burstTime = static_cast<std::uint64_t>(burst(gen));
+		p.remainingTime = p.burstTime;
+		p.priority = prio(gen);
+		p.dynamicPriority = p.priority;
+		// примерно у трети процессов есть I/O: atTick возрастает и строго меньше burstTime
+		if (p.burstTime >= 4 && coin(gen) < 35) {
+			std::uint64_t at = 1 + static_cast<std::uint64_t>(gen() % 2);
+			while (at < p.burstTime) {
+				p.ioBlocks.push_back({at, 2 + static_cast<std::uint64_t>(gen() % 4)});
+				at += 2 + static_cast<std::uint64_t>(gen() % 3);
+			}
+		}
+		procs.push_back(p);
+	}
+	return procs;
+}

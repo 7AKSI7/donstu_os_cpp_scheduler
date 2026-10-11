@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <vector>
 #include <memory>
+#include <functional>
 
 std::vector<Process> makeTestSet() {
   std::vector<Process> procs;
@@ -124,7 +125,76 @@ std::vector<Process> makeConvoySet() {
   return procs;
 }
 
+using Factory = std::function<std::unique_ptr<Scheduler>(const std::vector<Process>&)>;
+
+template <class T, class... Args>
+Factory factory(Args... args) {
+  return [=](const std::vector<Process>& s) {
+    return std::make_unique<T>(s, args...);
+  };
+}
+
+// metric: 0=wait, 1=turn, 2=resp, 3=CPU%
+void runExperiment10(int metric) {
+  std::vector<std::pair<std::string, Factory>> algos = {
+    {"FCFS",       factory<FcfsScheduler>()},
+    {"SJF",        factory<SjfScheduler>()},
+    {"SRTN",       factory<SrtnScheduler>()},
+    {"HRRN",       factory<HrrnScheduler>()},
+    {"RR q=4",     factory<RrScheduler>(4)},
+    {"Prio",       factory<PriorityScheduler>(false, false)},
+    {"Prio+aging", factory<PriorityScheduler>(true, true)},
+    {"MLFQ",       factory<MlfqScheduler>()},
+  };
+
+  const char* titles[4] = {
+    "Average waiting time",
+    "Average turnaround time",
+    "Average response time",
+    "CPU utilization (%)"
+  };
+  std::cout << "\n" << titles[metric] << "\n";
+
+  const int sizes[5] = {12, 14, 16, 18, 20};
+
+  std::cout << std::left << std::setw(12) << "Algorithm" << std::right;
+  for (int i = 1; i <= 5; ++i)
+    std::cout << std::setw(9) << ("set " + std::to_string(i));
+  std::cout << std::setw(9) << "average" << "\n";
+  std::cout << std::string(12 + 9 * 6, '-') << "\n";
+
+  for (auto& [label, make] : algos) {
+    std::cout << std::left << std::setw(12) << label << std::right;
+    double sum = 0;
+    for (unsigned seed = 1; seed <= 5; ++seed) {
+      auto set = makeRandomSet(seed, sizes[seed - 1]);
+      auto sched = make(set);
+      SimResult r = runSimulation(*sched);
+      double v = 0;
+      switch (metric) {
+        case 0: v = r.avgWaiting; break;
+        case 1: v = r.avgTurnaround; break;
+        case 2: v = r.avgResponse; break;
+        case 3: v = r.cpuUtilization; break;
+      }
+      sum += v;
+      std::cout << std::setw(9) << std::fixed << std::setprecision(2) << v;
+    }
+    std::cout << std::setw(9) << sum / 5 << "\n";
+  }
+}
+
 int main() {
+
+      // ===== Задание 10: сохранить 5 случайных наборов =====
+  {
+    const int sizes[5] = {12, 14, 16, 18, 20};
+    for (unsigned seed = 1; seed <= 5; ++seed) {
+      saveSet("sets/set" + std::to_string(seed) + ".txt", makeRandomSet(seed, sizes[seed - 1]));
+    }
+    std::cout << "Saved sets/set1..5.txt\n";
+  }
+
   std::cout << "Case 1: CPU-bound\n";
   {
     auto set1 = makeTestSet();
@@ -322,6 +392,11 @@ int main() {
     printResult(r);
     printProcessTable(s.processes());
   }
+
+  runExperiment10(0); // wait
+  runExperiment10(1); // turn
+  runExperiment10(2); // resp
+  runExperiment10(3); // CPU%
 
   return 0;
 }
