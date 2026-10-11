@@ -7,6 +7,7 @@
 #include "simulator.h"
 #include "testsets.h"
 #include "hrrn.h"
+#include "edf.h"
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -182,6 +183,26 @@ void runExperiment10(int metric) {
     }
     std::cout << std::setw(9) << sum / 5 << "\n";
   }
+}
+
+std::vector<Process> makeEdfTestSet() {
+  std::vector<Process> procs;
+  auto add = [&](int pid, const std::string& name, std::uint64_t arrival,
+                 std::uint64_t burst, std::uint64_t deadline) {
+    Process p;
+    p.pid = pid;
+    p.name = name;
+    p.arrivalTime = arrival;
+    p.burstTime = burst;
+    p.remainingTime = burst;
+    p.deadline = deadline;
+    procs.push_back(p);
+  };
+  // Классический пример, укладывающийся в сроки (загрузка 1.0)
+  add(1, "T1", 0, 2, 5);
+  add(2, "T2", 0, 3, 6);
+  add(3, "T3", 0, 1, 3);
+  return procs;
 }
 
 int main() {
@@ -412,6 +433,26 @@ int main() {
     for (int cores : {1, 2, 4}) {
       SrtnScheduler s(set);
       printResult(runSimulationMulti(s, cores));
+    }
+  }
+
+  std::cout << "\nCase 8. EDF\n";
+  {
+    auto set = makeEdfTestSet();
+    EdfScheduler edf(set);
+    SimResult r = runSimulation(edf);
+    printResult(r);
+    printGantt(r);
+    printProcessTable(edf.processes());
+
+    // Проверка дедлайнов
+    std::cout << "Deadline check:\n";
+    for (auto& p : edf.processes()) {
+      bool ok = p.finishTime <= p.deadline;
+      std::cout << "  " << p.name
+                << " finish=" << p.finishTime
+                << " deadline=" << p.deadline
+                << (ok ? "  OK" : "  MISS") << "\n";
     }
   }
 
