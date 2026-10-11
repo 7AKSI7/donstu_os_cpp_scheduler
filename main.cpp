@@ -398,5 +398,22 @@ int main() {
   runExperiment10(2); // resp
   runExperiment10(3); // CPU%
 
+  std::cout << "\nCase 7. Multicore (makeTestSet)\n";
+  {
+    auto set = makeTestSet();
+    for (int cores : {1, 2, 4}) {
+      FcfsScheduler s(set);
+      printResult(runSimulationMulti(s, cores));
+    }
+    for (int cores : {1, 2, 4}) {
+      SjfScheduler s(set);
+      printResult(runSimulationMulti(s, cores));
+    }
+    for (int cores : {1, 2, 4}) {
+      SrtnScheduler s(set);
+      printResult(runSimulationMulti(s, cores));
+    }
+  }
+
   return 0;
 }

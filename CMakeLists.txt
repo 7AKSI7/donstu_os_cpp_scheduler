@@ -18,6 +18,7 @@ add_executable(donstu_os_cpp_scheduler main.cpp
     testsets.h
     hrrn.h
     simulator.cpp
+    multicore.cpp
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
